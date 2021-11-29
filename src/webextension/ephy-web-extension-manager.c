@@ -40,6 +40,7 @@
 #include "api/runtime.h"
 #include "api/tabs.h"
 
+#include <adwaita.h>
 #include <json-glib/json-glib.h>
 
 struct _EphyWebExtensionManager {
@@ -150,6 +151,16 @@ ephy_web_extension_manager_scan_directory (EphyWebExtensionManager *self,
 }
 
 static void
+destroy_action (GtkWidget *action)
+{
+  GtkWidget *parent = gtk_widget_get_parent (action);
+
+  g_assert (GTK_IS_BOX (parent));
+
+  gtk_box_remove (GTK_BOX (parent), action);
+}
+
+static void
 ephy_web_extension_manager_constructed (GObject *object)
 {
   EphyWebExtensionManager *self = EPHY_WEB_EXTENSION_MANAGER (object);
@@ -157,7 +168,7 @@ ephy_web_extension_manager_constructed (GObject *object)
 
   self->background_web_views = g_hash_table_new (NULL, NULL);
   self->page_action_map = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)g_hash_table_destroy);
-  self->browser_action_map = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)gtk_widget_destroy);
+  self->browser_action_map = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)destroy_action);
   self->web_extensions = NULL;
 
   ephy_web_extension_manager_scan_directory (self, dir);
@@ -329,10 +340,9 @@ ephy_web_extension_manager_set_background_web_view (EphyWebExtensionManager *sel
   g_hash_table_insert (self->background_web_views, web_extension, web_view);
 }
 
-static gboolean
-page_action_clicked (GtkWidget      *event_box,
-                     GdkEventButton *event,
-                     gpointer        user_data)
+static void
+page_action_clicked (GtkButton *button,
+                     gpointer   user_data)
 {
   EphyWebExtension *web_extension = EPHY_WEB_EXTENSION (user_data);
   EphyShell *shell = ephy_shell_get_default ();
@@ -362,8 +372,6 @@ page_action_clicked (GtkWidget      *event_box,
                                            NULL,
                                            NULL,
                                            NULL);
-
-  return GDK_EVENT_STOP;
 }
 
 static GtkWidget *
@@ -371,20 +379,23 @@ create_page_action_widget (EphyWebExtensionManager *self,
                            EphyWebExtension        *web_extension)
 {
   GtkWidget *image;
-  GtkWidget *event_box;
-  GtkStyleContext *context;
+  GtkWidget *button;
 
-  /* Create new event box with page action */
-  event_box = gtk_event_box_new ();
+  button = gtk_button_new ();
+  gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
+
   image = gtk_image_new ();
-  gtk_container_add (GTK_CONTAINER (event_box), image);
-  g_signal_connect_object (event_box, "button_press_event", G_CALLBACK (page_action_clicked), web_extension, 0);
-  gtk_widget_show_all (event_box);
+  gtk_image_set_pixel_size (GTK_IMAGE (image), 16);
+  gtk_button_set_child (GTK_BUTTON (button), image);
 
-  context = gtk_widget_get_style_context (image);
-  gtk_style_context_add_class (context, "entry_icon");
+  gtk_widget_add_css_class (button, "image-button");
+  gtk_widget_add_css_class (button, "entry-icon");
+  gtk_widget_add_css_class (button, "end");
 
-  return g_object_ref (event_box);
+  g_signal_connect_object (button, "clicked",
+                           G_CALLBACK (page_action_clicked), web_extension, 0);
+
+  return g_object_ref (button);
 }
 
 static void
@@ -531,6 +542,16 @@ update_translations (EphyWebExtension *web_extension)
 }
 
 static void
+destroy_page_action (GtkWidget *action)
+{
+  EphyLocationEntry *entry;
+
+  entry = EPHY_LOCATION_ENTRY (gtk_widget_get_ancestor (action, EPHY_TYPE_LOCATION_ENTRY));
+
+  ephy_location_entry_page_action_remove (entry, action);
+}
+
+static void
 ephy_web_extension_manager_add_web_extension_to_webview (EphyWebExtensionManager *self,
                                                          EphyWebExtension        *web_extension,
                                                          EphyWindow              *window,
@@ -548,7 +569,7 @@ ephy_web_extension_manager_add_web_extension_to_webview (EphyWebExtensionManager
 
       table = g_hash_table_lookup (self->page_action_map, web_extension);
       if (!table) {
-        table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)gtk_widget_destroy);
+        table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)destroy_page_action);
         g_hash_table_insert (self->page_action_map, web_extension, table);
       }
 
@@ -561,15 +582,15 @@ ephy_web_extension_manager_add_web_extension_to_webview (EphyWebExtensionManager
 }
 
 static void
-page_attached_cb (HdyTabView *tab_view,
-                  HdyTabPage *page,
+page_attached_cb (AdwTabView *tab_view,
+                  AdwTabPage *page,
                   gint        position,
                   gpointer    user_data)
 {
   EphyWebExtension *web_extension = EPHY_WEB_EXTENSION (user_data);
-  GtkWidget *child = hdy_tab_page_get_child (page);
+  GtkWidget *child = adw_tab_page_get_child (page);
   EphyWebView *web_view = ephy_embed_get_web_view (EPHY_EMBED (child));
-  EphyWindow *window = EPHY_WINDOW (gtk_widget_get_toplevel (GTK_WIDGET (tab_view)));
+  EphyWindow *window = EPHY_WINDOW (gtk_widget_get_root (GTK_WIDGET (tab_view)));
   EphyWebExtensionManager *self = ephy_shell_get_web_extension_manager (ephy_shell_get_default ());
 
   ephy_web_extension_manager_add_web_extension_to_webview (self, web_extension, window, web_view);
@@ -671,7 +692,7 @@ create_browser_popup (EphyWebExtension *web_extension)
   g_autofree char *dir_name = NULL;
   const char *popup;
 
-  popover = gtk_popover_new (NULL);
+  popover = gtk_popover_new ();
 
   web_view = create_web_extensions_webview (web_extension, TRUE);
 
@@ -680,14 +701,13 @@ create_browser_popup (EphyWebExtension *web_extension)
   base_uri = g_strdup_printf ("ephy-webextension:///%s/", dir_name);
   data = ephy_web_extension_get_resource_as_string (web_extension, popup);
   webkit_web_view_load_html (WEBKIT_WEB_VIEW (web_view), (char *)data, base_uri);
-  gtk_container_add (GTK_CONTAINER (popover), web_view);
-  gtk_widget_show_all (web_view);
+  gtk_popover_set_child (GTK_POPOVER (popover), web_view);
 
   return popover;
 }
 
-static gboolean
-on_browser_action_clicked (GtkWidget *event_box,
+static void
+on_browser_action_clicked (GtkWidget *button,
                            gpointer   user_data)
 {
   EphyShell *shell = ephy_shell_get_default ();
@@ -710,8 +730,6 @@ on_browser_action_clicked (GtkWidget *event_box,
                                            NULL,
                                            NULL,
                                            NULL);
-
-  return GDK_EVENT_STOP;
 }
 
 
@@ -721,28 +739,32 @@ create_browser_action (EphyWebExtension *web_extension)
   GtkWidget *button;
   GtkWidget *image;
   GtkWidget *popover;
+  GdkPixbuf *pixbuf = ephy_web_extension_browser_action_get_icon (web_extension, 16);
 
   if (ephy_web_extension_get_browser_popup (web_extension)) {
     button = gtk_menu_button_new ();
-    image = gtk_image_new_from_pixbuf (ephy_web_extension_browser_action_get_icon (web_extension, 16));
+
+    if (pixbuf)
+      image = gtk_image_new_from_pixbuf (pixbuf);
+    else
+      image = gtk_image_new_from_icon_name ("application-x-addon-symbolic");
+
+    gtk_menu_button_set_child (GTK_MENU_BUTTON (button), image);
+    gtk_widget_add_css_class (button, "image-button");
+
     popover = create_browser_popup (web_extension);
     gtk_menu_button_set_popover (GTK_MENU_BUTTON (button), popover);
-
-    gtk_button_set_image (GTK_BUTTON (button), image);
-    gtk_widget_set_visible (button, TRUE);
   } else {
-    GdkPixbuf *pixbuf = ephy_web_extension_browser_action_get_icon (web_extension, 16);
-
     button = gtk_button_new ();
 
     if (pixbuf)
       image = gtk_image_new_from_pixbuf (pixbuf);
     else
-      image = gtk_image_new_from_icon_name ("application-x-addon-symbolic", GTK_ICON_SIZE_BUTTON);
+      image = gtk_image_new_from_icon_name ("application-x-addon-symbolic");
 
     g_signal_connect_object (button, "clicked", G_CALLBACK (on_browser_action_clicked), web_extension, 0);
-    gtk_button_set_image (GTK_BUTTON (button), image);
-    gtk_widget_set_visible (button, TRUE);
+    gtk_button_set_child (GTK_BUTTON (button), image);
+    gtk_widget_add_css_class (button, "image-button");
   }
 
   return button;
@@ -754,7 +776,7 @@ ephy_web_extension_manager_add_web_extension_to_window (EphyWebExtensionManager 
                                                         EphyWindow              *window)
 {
   EphyTabView *tab_view = ephy_window_get_tab_view (EPHY_WINDOW (window));
-  HdyTabView *view = ephy_tab_view_get_tab_view (tab_view);
+  AdwTabView *view = ephy_tab_view_get_tab_view (tab_view);
 
   if (!ephy_web_extension_manager_is_active (self, web_extension))
     return;
@@ -821,7 +843,7 @@ ephy_web_extension_manager_remove_web_extension_from_window (EphyWebExtensionMan
                                                              EphyWindow              *window)
 {
   EphyTabView *tab_view = ephy_window_get_tab_view (EPHY_WINDOW (window));
-  HdyTabView *view = ephy_tab_view_get_tab_view (tab_view);
+  AdwTabView *view = ephy_tab_view_get_tab_view (tab_view);
   GtkWidget *browser_action_widget;
 
   if (ephy_web_extension_manager_is_active (self, web_extension))

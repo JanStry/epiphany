@@ -73,40 +73,33 @@ conf.set_quoted('GSB_API_KEY', gsb_api_key)
 conf.set10('ENABLE_GSB', gsb_api_key != '')
 
 glib_requirement = '>= 2.67.4'
-gtk_requirement = '>= 3.24.0'
+gtk_requirement = '>= 4.5.0'
 nettle_requirement = '>= 3.4'
 webkitgtk_requirement = '>= 2.33.2'
 
 cairo_dep = dependency('cairo', version: '>= 1.2')
-gcr_dep = dependency('gcr-3', version: '>= 3.5.5')
+gcr_dep = dependency('gcr-4-gtk4', version: '>= 3.9.0')
 gdk_pixbuf_dep = dependency('gdk-pixbuf-2.0', version: '>= 2.36.5')
 gio_dep = dependency('gio-2.0', version: glib_requirement)
 gio_unix_dep = dependency('gio-unix-2.0', version: glib_requirement)
 glib_dep = dependency('glib-2.0', version: glib_requirement)
 gsettings_desktop_schemas = dependency('gsettings-desktop-schemas')
-gtk_dep = dependency('gtk+-3.0', version: gtk_requirement)
-gtk_unix_print_dep = dependency('gtk+-unix-print-3.0', version: gtk_requirement)
+gtk_dep = dependency('gtk4', version: gtk_requirement)
+gtk_unix_print_dep = dependency('gtk4-unix-print', version: gtk_requirement)
 hogweed_dep = dependency('hogweed', version: nettle_requirement)
 iso_codes_dep = dependency('iso-codes', version: '>= 0.35')
 json_glib_dep = dependency('json-glib-1.0', version: '>= 1.6')
 libarchive_dep = dependency('libarchive')
-libdazzle_dep = dependency('libdazzle-1.0', version: '>= 3.37.1')
-libhandy_dep = dependency('libhandy-1', version: '>= 1.5.0')
+libadwaita_dep = dependency('libadwaita-1', version: '>= 1.0.0')
 libsecret_dep = dependency('libsecret-1', version: '>= 0.19.0')
 libxml_dep = dependency('libxml-2.0', version: '>= 2.6.12')
 nettle_dep = dependency('nettle', version: nettle_requirement)
-portal_dep = dependency('libportal-gtk3', version: '>= 0.6')
+portal_dep = dependency('libportal-gtk4', version: '>= 0.6')
 sqlite3_dep = dependency('sqlite3', version: '>= 3.22')
 
-if get_option('soup2').enabled()
-  libsoup_dep = dependency('libsoup-2.4', version: '>= 2.48.0')
-  webkit2gtk_dep = dependency('webkit2gtk-4.0', version: webkitgtk_requirement)
-  webkit2gtk_web_extension_dep = dependency('webkit2gtk-web-extension-4.0', version: webkitgtk_requirement)
-else
-  libsoup_dep = dependency('libsoup-3.0', version: '>= 2.99.4')
-  webkit2gtk_dep = dependency('webkit2gtk-4.1', version: webkitgtk_requirement)
-  webkit2gtk_web_extension_dep = dependency('webkit2gtk-web-extension-4.1', version: webkitgtk_requirement)
-endif
+libsoup_dep = dependency('libsoup-3.0', version: '>= 2.99.4')
+webkit2gtk_dep = dependency('webkit2gtk-5.0', version: webkitgtk_requirement)
+webkit2gtk_web_extension_dep = dependency('webkit2gtk-web-extension-5.0', version: webkitgtk_requirement)
 
 webkit_revision = webkit2gtk_dep.get_variable(pkgconfig : 'revision', default_value : '')
 if webkit_revision == 'tarball'
