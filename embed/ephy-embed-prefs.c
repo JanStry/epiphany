@@ -563,7 +563,7 @@ ephy_embed_prefs_init (gpointer user_data)
 {
   guint i;
 
-  webkit_settings = webkit_settings_new_with_settings ("enable-back-forward-navigation-gestures", TRUE,
+  webkit_settings = webkit_settings_new_with_settings ("enable-back-forward-navigation-gestures", FALSE,
                                                        "enable-developer-extras", TRUE,
                                                        "enable-dns-prefetching", TRUE,
                                                        "enable-plugins", FALSE,
